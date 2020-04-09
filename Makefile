@@ -1,8 +1,14 @@
 # Makefile
 
+# Makefile util
+SHELL := /bin/bash
+# The directory of this file
+DIR := $(shell echo $(shell cd "$(shell  dirname "${BASH_SOURCE[0]}" )" && pwd ))
+
 DOCKER_REPO=ngenetzky/dsind
 DOCKER_TAG=latest
 IMAGE_NAME=${DOCKER_REPO}:${DOCKER_TAG}
+
 
 ################################################################################
 # This will output the help for each task
@@ -15,7 +21,9 @@ help: ## This help
 .DEFAULT_GOAL := help
 
 build: ## Build the image
-	docker build ./
+	${DIR}/hooks/build \
+		"${DOCKER_REPO}" \
+		"${DOCKER_TAG}"
 
 run: ## Run the container
 	docker run -it \
