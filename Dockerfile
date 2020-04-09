@@ -200,9 +200,10 @@ RUN cd './yoctoproject_releases/' \
     && cd '../' \
     && datalad save './'
 
-RUN bash -x \
-    './yoctoproject_releases/.local/bin/datalad_addurls_yoctoproject_releases.bash' \
-    'data/yocto-2.6.4-toolchain-x86_64.csv'
+RUN cd "/home/${USER_NAME}/" \
+    && datalad run -- \
+        './yoctoproject_releases/.local/bin/datalad_addurls_yoctoproject_releases.bash' \
+            'data/yocto-2.6.4-toolchain-x86_64.csv'
 
 # Build-time metadata as defined at http://label-schema.org
 LABEL \
