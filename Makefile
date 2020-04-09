@@ -15,7 +15,7 @@ help: ## This help
 .DEFAULT_GOAL := help
 
 build: ## Build the image
-	docker build -t "${DOCKER_REPO}:${DOCKER_TAG}" ./
+	docker build ./
 
 run: ## Run the container
 	docker run -it \
