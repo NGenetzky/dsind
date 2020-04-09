@@ -169,6 +169,41 @@ RUN cd "/home/${USER_NAME}/" \
     && datalad save --message "dataset: New dataset for ${DSIND_USER_NAME}" \
         './'
 
+RUN cd "/home/${USER_NAME}/" \
+    && ( \
+        printf 'T0="%s"\nUUID="%s"\nNAME="%s"\nEMAIL="%s"' \
+            "$(date --iso-8601=d)" \
+            "$(uuidgen -t)" \
+            "${DSIND_USER_NAME}" \
+            "${DSIND_USER_EMAIL}" \
+    ) > ".dsind/user.toml" \
+    && datalad save ./ \
+    && datalad create \
+        --dataset './' \
+        './yoctoproject_releases/'
+
+COPY \
+        "./code/datalad_addurls_yoctoproject_releases.bash" \
+        "./data/yocto-2.6.4-toolchain-x86_64.csv" \
+    /tmp/
+
+RUN cd './yoctoproject_releases/' \
+    && install -d './.local/bin' './data' \
+    && datalad run -- \
+        install -m 0775 \
+            '/tmp/datalad_addurls_yoctoproject_releases.bash' \
+            './.local/bin/datalad_addurls_yoctoproject_releases.bash' \
+    && datalad run -- \
+        install -m 0664 \
+            '/tmp/yocto-2.6.4-toolchain-x86_64.csv' \
+            'data/yocto-2.6.4-toolchain-x86_64.csv' \
+    && cd '../' \
+    && datalad save './'
+
+RUN bash -x \
+    './yoctoproject_releases/.local/bin/datalad_addurls_yoctoproject_releases.bash' \
+    'data/yocto-2.6.4-toolchain-x86_64.csv'
+
 # Build-time metadata as defined at http://label-schema.org
 LABEL \
     maintainer="${META_MAINTAINER}" \
