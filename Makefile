@@ -18,4 +18,12 @@ build: ## Build the image
 	docker build -t "${DOCKER_REPO}:${DOCKER_TAG}" ./
 
 run: ## Run the container
-	docker run -it -u 0:0 "${DOCKER_REPO}:${DOCKER_TAG}"
+	docker run -it \
+		--user 0:0 \
+		"${DOCKER_REPO}:${DOCKER_TAG}"
+
+login: ## Run login shell in the container
+	docker run -it \
+		--entrypoint /bin/bash \
+		"${DOCKER_REPO}:${DOCKER_TAG}" \
+		--login
