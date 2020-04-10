@@ -1,0 +1,56 @@
+#!/bin/bash
+# This is a hub.docker.com hook for the build phase.
+# https://docs.docker.com/docker-hub/builds/advanced/#environment-variables-for-building-and-testing#custom-build-phase-hooks
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Bash Strict Mode
+    set -eu -o pipefail
+    IFS=$'\n\t'
+fi
+
+# config
+_DOCKER_REPO='ngenetzky/dsind'
+_DOCKER_TAG='latest'
+REL_TO_BASE="./../"
+
+BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+readonly \
+    BASE_DIR \
+    REL_TO_BASE \
+    _DOCKER_REPO \
+    _DOCKER_TAG
+
+build(){
+    DOCKER_REPO="${DOCKER_REPO-${_DOCKER_REPO}}"
+    DOCKER_TAG="${DOCKER_TAG-${_DOCKER_TAG}}"
+
+    DOCKER_REPO="${1-${DOCKER_REPO}}"
+    DOCKER_TAG="${2-${DOCKER_TAG}}"
+    SOURCE_BRANCH='unknown-branch'
+    SOURCE_COMMIT='unknown-commit'
+    DOCKERFILE_PATH='Dockerfile'
+    IMAGE_NAME="${DOCKER_REPO?}:${DOCKER_TAG?}"
+
+    BUILD_DATE="$(date --iso-8601=d)"
+
+    # Work from base dir
+    cd "${BASE_DIR}/${REL_TO_BASE}"
+    [[ -f "${DOCKERFILE_PATH}" ]] || exit 1
+
+    docker build \
+        --build-arg BUILD_DATE="${BUILD_DATE?}" \
+        --build-arg DOCKERFILE_PATH="${DOCKERFILE_PATH?}" \
+        --build-arg DOCKER_REPO="${DOCKER_REPO?}" \
+        --build-arg DOCKER_TAG="${DOCKER_TAG?}" \
+        --build-arg IMAGE_NAME="${IMAGE_NAME?}" \
+        --build-arg SOURCE_BRANCH="${SOURCE_BRANCH?}" \
+        --build-arg SOURCE_COMMIT="${SOURCE_COMMIT?}" \
+        \
+        -f "${DOCKERFILE_PATH?}" \
+        -t "${IMAGE_NAME?}" \
+        .
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    build "$@"
+fi
