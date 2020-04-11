@@ -44,27 +44,28 @@ RUN apt-get --quiet --yes update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Add apt repository from neuro debian
-# "http://neuro.debian.net/lists/bionic.us-tn.full"
-# Install ppa key for 'neurodebian' so that we can install the
-# latest 'git-annex' (Ubuntu 18.04 only has 6.20180227-1).
-# http://neuro.debian.net/install_pkg.html?p=git-annex-standalone
-COPY .local/share/keyring/neuro.debian.net.asc /tmp/
-RUN cat '/tmp/neuro.debian.net.asc' | apt-key add - \
-    && curl \
-        -o "/etc/apt/sources.list.d/neurodebian.sources.list" \
-            "http://neuro.debian.net/lists/bionic.us-tn.full" \
-    && apt-get --quiet --yes update \
-    # Then we can proceed with our packages
-    && apt-get -y install --no-install-recommends \
-        # Basic tools
-        # Install git-annex and datalad
-        git-annex-standalone \
-        datalad \
-    # Clean up
-    && apt-get autoremove -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# TODO: Provide git-annex without depending on 'neuro.debian.net'
+# # Add apt repository from neuro debian
+# # "http://neuro.debian.net/lists/bionic.us-tn.full"
+# # Install ppa key for 'neurodebian' so that we can install the
+# # latest 'git-annex' (Ubuntu 18.04 only has 6.20180227-1).
+# # http://neuro.debian.net/install_pkg.html?p=git-annex-standalone
+# COPY .local/share/keyring/neuro.debian.net.asc /tmp/
+# RUN cat '/tmp/neuro.debian.net.asc' | apt-key add - \
+#     && curl \
+#         -o "/etc/apt/sources.list.d/neurodebian.sources.list" \
+#             "http://neuro.debian.net/lists/bionic.us-tn.full" \
+#     && apt-get --quiet --yes update \
+#     # Then we can proceed with our packages
+#     && apt-get -y install --no-install-recommends \
+#         # Basic tools
+#         # Install git-annex and datalad
+#         git-annex-standalone \
+#         datalad \
+#     # Clean up
+#     && apt-get autoremove -y \
+#     && apt-get clean \
+#     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ################################################################################
 # docker metadata

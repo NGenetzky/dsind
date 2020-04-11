@@ -1,2 +1,3 @@
 *
-!.local/share/keyring/neuro.debian.net.asc
+# TODO: Provide git-annex without depending on 'neuro.debian.net'
+# !.local/share/keyring/neuro.debian.net.asc
