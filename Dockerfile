@@ -22,10 +22,8 @@ RUN apt-get --quiet --yes update \
         dialog \
     # Then we can proceed with our packages
     && apt-get -y install --no-install-recommends \
-        # Basic tools
+        # apt packages for base
         bash \
-        build-essential \
-        ca-certificates \
         curl \
         git \
         lsb-release \
@@ -99,6 +97,8 @@ RUN install -d '/root/.dsind/' \
 #     && apt-get autoremove -y \
 #     && apt-get clean \
 #     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+
 
 ################################################################################
 # docker metadata
