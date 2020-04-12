@@ -35,3 +35,19 @@ login: ## Run login shell in the container
 		--entrypoint /bin/bash \
 		"${DOCKER_REPO}:${DOCKER_TAG}" \
 		--login
+
+.PHONY: test
+test: ## Run arbitrary test on the container
+	docker run -it \
+		--entrypoint /bin/bash \
+		--workdir '/root/' \
+		"${DOCKER_REPO}:${DOCKER_TAG}" \
+		--login \
+		-c "set -x && ( \
+			cd .dsind/ \
+			&& git ls-files \
+			&& git log \
+				--oneline \
+				--graph \
+				--name-only \
+		)"
