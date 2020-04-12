@@ -431,8 +431,18 @@ RUN cd '/home/user/.dsind/' \
             '.config/datalad/procedures/cfg_dsind.py' \
         && datalad run-procedure --discover \
         && datalad run-procedure cfg_dsind \
-    ) && printf "%80s\n" ' ' | tr ' ' '-'
+    ) \
+    && printf "%80s\n" ' ' | tr ' ' '-'
 
+COPY code/python/dsind /home/user/.dsind/code/python/dsind
+RUN cd '/home/user/.dsind/' \
+    && datalad save ./ \
+    && printf "%80s\n" ' ' | tr ' ' '-' \
+    && ( \
+        datalad run 'cat code/python/dsind/requirements.txt | tee --append requirements.txt' \
+        && pip3 install --user --requirement '/home/user/.dsind/requirements.txt' \
+    ) \
+    && printf "%80s\n" ' ' | tr ' ' '-'
 
 ####
 # WIP
