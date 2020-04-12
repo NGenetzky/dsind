@@ -10,6 +10,10 @@
 #
 FROM phusion/baseimage:0.11
 
+################################################################################
+# System Setup for dsind
+####
+
 # Using "ARG" influences the behavior of apt only while building container.
 # No Debian that's a bad Debian! We don't have an interactive prompt don't fail
 ARG DEBIAN_FRONTEND=noninteractive
@@ -42,38 +46,89 @@ RUN apt-get --quiet --yes update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-################################################################################
-# USER root # dsind.github.io+dsind_root@gmail.com
-####
-USER root
-
 ARG PYTHON_REQUIREMENTS_TXT='datalad==0.12.5'
-RUN install -d '/root/.dsind/' \
+RUN cd '/root/' \
     # Install python dependencies
     && ( \
         printf '# date="%s"\n# uuid="%s"\n# path="%s"\n' \
             "$(date --iso-8601=d)" \
             "$(uuidgen -t)" \
-            '/root/.dsind/requirements.txt' \
-        && echo "${PYTHON_REQUIREMENTS_TXT}" \
-    ) | tee '/root/.dsind/requirements.txt' \
-    && pip3 install --user --requirement '/root/.dsind/requirements.txt' \
-    && ln -s -T '/root/.local/bin/datalad' '/usr/local/sbin/datalad' \
-    \
-    # Configure git user
-    && git config --global user.name "root dsind.github.io" \
-    && git config --global user.email "dsind.github.io+dsind_root@gmail.com" \
-    \
-    # Save the dataset
-    && cd '/root/.dsind/' \
-    && datalad create --force --no-annex './' \
-    && datalad save ./ \
-    # Clean up XDG_CACHE_HOME # TODO: Disable cache or set to unique temp location.
-    && rm -rf '/root/.cache/'
+            '/etc/python3/requirements.txt' \
+        && echo "${PYTHON_REQUIREMENTS_TXT}"  \
+    ) | tee '/etc/python3/requirements.txt' \
+    && pip3 install \
+        --no-cache-dir \
+        --requirement '/etc/python3/requirements.txt'
+
+####
+# System Setup for dsind
+################################################################################
+
+################################################################################
+# USER root # dsind.github.io+dsind_root@gmail.com
+####
+
+RUN cd '/root/' \
+    && install -d '.dsind/' \
+    && date --iso-8601=d > '.dsind/.date.txt' \
+    && uuidgen -t > '.dsind/.uuid.txt' \
+    && cat '.dsind/.uuid.txt' >> '.dsind/.uuid.log' \
+    # Create new dsind host
+    && printf 'date="%s"\nuuid="%s"\nname="%s"\ninfo="%s"\n' \
+        "$(cat .dsind/.date.txt)" \
+        "$(cat .dsind/.uuid.txt)" \
+        "$(hostname)" \
+        "$(uname -a)" \
+        > '.dsind/.host.toml' \
+    # Create new dsind user
+    && uuidgen -t > '.dsind/.uuid.txt' \
+    && cat '.dsind/.uuid.txt' >> '.dsind/.uuid.log' \
+    && printf 'date="%s"\nuuid="%s"\nname="%s"\nemail="%s"\n' \
+        "$(cat .dsind/.date.txt)" \
+        "$(cat .dsind/.uuid.txt)" \
+        "root dsind.github.io" \
+        "dsind.github.io+dsind_root_$(cat .dsind/.date.txt)_$(cat .dsind/.uuid.txt)@gmail.com" \
+        > '.dsind/.user.toml' \
+    # Configure git user from dsind user
+    && ( \
+        . '.dsind/.user.toml' \
+        && git config --global user.name "${name}" \
+        && git config --global user.email "${email}" \
+    ) \
+    # Create the base dataset for this host.
+    && ( \
+        cd '.dsind/' \
+        && datalad create --force --no-annex './' \
+        && datalad save ./ \
+        && datalad run "uuidgen -t > .uuid.txt ; cat .uuid.txt >> .uuid.log" \
+        && git branch "by-uuid/$(cat .uuid.txt)" \
+        && git branch "by-id/0" \
+    )
 
 ####
 # USER root # dsind.github.io+dsind_root@gmail.com
 ################################################################################
+
+################################################################################
+# WIP
+####
+
+RUN install -d '/etc/skel/.dsind' \
+    # Configure bash with sensible defaults.
+    && curl -o '/usr/local/share/bash-sensible.bash' \
+        "https://raw.githubusercontent.com/mrzool/bash-sensible/5a2269a6a12e2a1b10629bb223f2f3c27ac07050/sensible.bash" \
+    && ( \
+        printf 'f=%s && [[ -f $f ]] && source $f' \
+            "'/usr/local/share/bash-sensible.bash'" \
+    ) >> '/etc/skel/.bashrc'
+
+####
+# WIP
+################################################################################
+
+################################################################################
+# git-annex
+####
 
 # TODO: Provide git-annex without depending on 'neuro.debian.net'
 # # Add apt repository from neuro debian
@@ -98,10 +153,12 @@ RUN install -d '/root/.dsind/' \
 #     && apt-get clean \
 #     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-
+####
+# git-annex
+################################################################################
 
 ################################################################################
-# docker metadata
+# docker args for metadata
 ####
 
 # docker-hub environment-variables
@@ -130,32 +187,14 @@ ARG META_SUMMARY='DSIND for Nathan Genetzky'
 ARG META_MAINTAINER='Nathan Genetzky <nathan@genetzky.us>'
 
 ####
-# docker metadata
+# docker args for metadata
 ################################################################################
 
-RUN install -d '/etc/skel/.dsind' \
-    && ( \
-        printf 'T0="%s"\nUUID="%s"\nNAME="%s"\nINFO="%s"\n' \
-            "$(date --iso-8601=d)" \
-            "$(uuidgen -t)" \
-            "$(hostname)" \
-            "$(uname -a)" \
-    ) > "/etc/skel/.dsind/host.toml" \
-    && ( \
-        printf 'T0="%s"\nUUID="%s"\nNAME="%s"\nVCS_URL="%s"\nVCS_REF="%s"\n' \
-            "$(date --iso-8601=d)" \
-            "$(uuidgen -t)" \
-            "${IMAGE_NAME}" \
-            "${META_VCS_URL}" \
-            "${SOURCE_COMMIT}" \
-    ) > "/etc/skel/.dsind/image.toml" \
-    # Configure bash with sensible defaults.
-    && curl -o '/usr/local/share/bash-sensible.bash' \
-        "https://raw.githubusercontent.com/mrzool/bash-sensible/5a2269a6a12e2a1b10629bb223f2f3c27ac07050/sensible.bash" \
-    && ( \
-        printf 'f=%s && [[ -f $f ]] && source $f' \
-            "'/usr/local/share/bash-sensible.bash'" \
-    ) >> '/etc/skel/.bashrc'
+################################################################################
+# docker metadata
+
+USER root
+WORKDIR /root/
 
 # Build-time metadata as defined at http://label-schema.org
 LABEL \
@@ -171,3 +210,7 @@ LABEL \
     org.label-schema.vcs-ref="$SOURCE_COMMIT" \
     org.label-schema.vcs-url="$META_VCS_URL" \
     org.label-schema.version="$SOURCE_COMMIT"
+
+####
+# docker metadata
+################################################################################
