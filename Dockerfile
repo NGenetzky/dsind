@@ -60,6 +60,69 @@ RUN cd '/root/' \
         --no-cache-dir \
         --requirement '/etc/python3/requirements.txt'
 
+# NOTE: We knowingly violate the convention of system GID being below 1000.
+# NOTE: We use '37463' because it spells out 'dsind' on keypad.
+RUN groupadd dsind --system --gid '37463' \
+    && install --directory \
+        --mode '775' \
+        --group 'dsind' \
+        '/var/lib/dsind/by-domain/' \
+        '/var/lib/dsind/by-id/' \
+        '/var/lib/dsind/by-uuid/' \
+        '/var/lib/dsind/template/' \
+    && ( \
+        git init '/var/lib/dsind/by-id/0/' \
+        && cd '/var/lib/dsind/by-id/0/' \
+        && git remote add 'github.com/dsind/id-0' 'https://github.com/dsind/id-0.git' \
+        && git fetch 'github.com/dsind/id-0' \
+        && git reset --hard '692128780d4474abdcd1bdb7bde8370ba5e0c8d7' \
+        && git branch 'by-id/0' \
+    ) \
+    && ( \
+        git init --shared='world' '/var/lib/dsind/by-id/1/' \
+        && cd '/var/lib/dsind/by-id/1/' \
+        && git remote add 'origin' '/var/lib/dsind/by-id/0/' \
+        && git remote add 'github.com/dsind/id-0' 'https://github.com/dsind/id-0.git' \
+        && git fetch 'origin' \
+        && git reset --hard '692128780d4474abdcd1bdb7bde8370ba5e0c8d7' \
+        && git branch 'by-id/0' \
+        && git branch 'by-id/1' \
+    ) \
+    && ( \
+        cd '/var/lib/dsind/template/' \
+        && git init \
+        && git remote add 'github.com/dsind/id-0' 'https://github.com/dsind/id-0.git' \
+        && git remote add 'local/dsind/id-0' '/var/lib/dsind/by-id/0/' \
+        && git remote add 'local/dsind/id-1' '/var/lib/dsind/by-id/1/' \
+        && git remote add 'origin' '/var/lib/dsind/by-id/1/' \
+        && git fetch origin \
+        && git merge 'origin/master' \
+        \
+        # We will use this template for the start of the user dsind.
+        && cp -T -R '/var/lib/dsind/template/' '/etc/skel/.dsind/' \
+    )
+
+RUN cd '/etc/skel/' \
+    && date --iso-8601=d > '.dsind/.date.txt' \
+    && uuidgen -t > '.dsind/.uuid.txt' \
+    && cat '.dsind/.uuid.txt' >> '.dsind/.uuid.log' \
+    \
+    # Create new dsind host
+    && printf 'date="%s"\nuuid="%s"\nname="%s"\ninfo="%s"\n' \
+        "$(cat .dsind/.date.txt)" \
+        "$(cat .dsind/.uuid.txt)" \
+        "$(hostname)" \
+        "$(uname -a)" \
+        > '.dsind/.host.toml' \
+    \
+    # Configure bash with sensible defaults.
+    && curl -o '/usr/local/share/bash-sensible.bash' \
+        "https://raw.githubusercontent.com/mrzool/bash-sensible/5a2269a6a12e2a1b10629bb223f2f3c27ac07050/sensible.bash" \
+    && ( \
+        printf 'f=%s && [[ -f $f ]] && source $f' \
+            "'/usr/local/share/bash-sensible.bash'" \
+    ) >> '/etc/skel/.bashrc'
+
 ####
 # System Setup for dsind
 ################################################################################
@@ -69,7 +132,9 @@ RUN cd '/root/' \
 ####
 
 RUN cd '/root/' \
-    && install -d '.dsind/' \
+    # Start with the same '/etc/skel' as other user.
+    && cp -T -R '/etc/skel/' './' \
+    \
     && date --iso-8601=d > '.dsind/.date.txt' \
     && uuidgen -t > '.dsind/.uuid.txt' \
     && cat '.dsind/.uuid.txt' >> '.dsind/.uuid.log' \
@@ -102,7 +167,7 @@ RUN cd '/root/' \
         && datalad save ./ \
         && datalad run "uuidgen -t > .uuid.txt ; cat .uuid.txt >> .uuid.log" \
         && git branch "by-uuid/$(cat .uuid.txt)" \
-        && git branch "by-id/0" \
+        && git push 'local/dsind/id-1' "by-uuid/$(cat .uuid.txt):by-uuid/$(cat .uuid.txt)" \
     )
 
 ####
@@ -112,15 +177,6 @@ RUN cd '/root/' \
 ################################################################################
 # WIP
 ####
-
-RUN install -d '/etc/skel/.dsind' \
-    # Configure bash with sensible defaults.
-    && curl -o '/usr/local/share/bash-sensible.bash' \
-        "https://raw.githubusercontent.com/mrzool/bash-sensible/5a2269a6a12e2a1b10629bb223f2f3c27ac07050/sensible.bash" \
-    && ( \
-        printf 'f=%s && [[ -f $f ]] && source $f' \
-            "'/usr/local/share/bash-sensible.bash'" \
-    ) >> '/etc/skel/.bashrc'
 
 ####
 # WIP
