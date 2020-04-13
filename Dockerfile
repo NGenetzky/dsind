@@ -317,16 +317,113 @@ RUN cat '/tmp/neuro.debian.net.asc' | apt-key add - \
 #########
 #########
 
+## FROM locally build image:
 # FROM phusion-datalad_0.11-r0.0 as dsind
 FROM phusion-datalad_0.11-r0.1 as dsind
 
+## FROM cached image:
+# FROM ngenetzky/dsind-host-phusion:latest as dsind
+# FROM ngenetzky/dsind-host-phusion:build as dsind
+
+################################################################################
+# USER user # dsind.github.io+dsind_user@gmail.com
+####
+
+# Configuration for default non-root user.
+ARG USER_NAME='user'
+ARG USER_UID='1000'
+ARG USER_GID="$USER_UID"
+ARG USER_SHELL='/bin/bash'
+# Create non-root user and give them sudo with nopasswd.
+RUN printf "### Building image for user %s (%s:%s) ###" \
+        "${USER_NAME}" \
+        "${USER_UID}" \
+        "${USER_GID}" \
+    #
+    # Create a non-root user.
+    && groupadd --gid "$USER_GID" \
+        "$USER_NAME" \
+    && useradd --create-home --shell "${USER_SHELL}" \
+        --uid "${USER_UID}" --gid "${USER_GID}" \
+        # NOTE: Added to special group for 'dsind'
+        --group 'dsind' \
+        "${USER_NAME}" \
+    #
+    # Add sudo support for the non-root user
+    && echo "$USER_NAME ALL=(root) NOPASSWD:ALL" > "/etc/sudoers.d/$USER_NAME" \
+    && chmod 0440 "/etc/sudoers.d/$USER_NAME" \
+    #
+    # Special steps for vscode remote-container support
+    && install -d --mode 0755 --owner "${USER_UID}" --group "${USER_GID}" \
+        '/workspace/' \
+        '/workspaces/' \
+        \
+        "/home/$USER_NAME/.vscode-server" \
+        "/home/$USER_NAME/.vscode-server/bin" \
+        "/home/$USER_NAME/.vscode-server/extensions"
+
+USER "${USER_NAME}"
+WORKDIR "/home/${USER_NAME}"
+
+RUN cd "/home/${USER_NAME}" \
+    # Start with the same '/etc/skel' as other user.
+    && date --iso-8601=d > '.dsind/.date.txt' \
+    \
+    # Create new dsind user
+    ## UUID: new dsind user
+    && uuidgen -t > '.dsind/.uuid.txt' \
+    && cat '.dsind/.uuid.txt' >> '.dsind/.uuid.log' \
+    && printf 'date="%s"\nuuid="%s"\nname="%s"\nemail="%s"\n' \
+        "$(cat .dsind/.date.txt)" \
+        "$(cat .dsind/.uuid.txt)" \
+        "user dsind.github.io" \
+        "dsind.github.io+dsind_user_$(cat .dsind/.date.txt)_$(cat .dsind/.uuid.txt)@gmail.com" \
+        > '.dsind/.user.toml' \
+    # Configure git user from dsind user
+    && ( \
+        . '.dsind/.user.toml' \
+        && git config --global user.name "${name}" \
+        && git config --global user.email "${email}" \
+    ) \
+    # Create the base dataset for this host.
+    && ( \
+        cd '.dsind/' \
+        # UUID: from 'new dsind user' above
+        && git checkout -b "by-uuid/$(cat .uuid.txt)" \
+        && datalad create --force --no-annex './' \
+        && datalad save ./ \
+        \
+        # UUID: new dsind host (may be duplicate of UUID from '/etc/skel/')
+        # NOTE: Redo 'new dsind host' in case cache was used for previous layer.
+        && datalad run "uuidgen -t > .uuid.txt ; cat .uuid.txt >> .uuid.log" \
+        # Create new dsind host
+        && printf 'date="%s"\nuuid="%s"\nname="%s"\ninfo="%s"\n' \
+            "$(cat .date.txt)" \
+            "$(cat .uuid.txt)" \
+            "$(hostname)" \
+            "$(uname -a)" \
+            > '.host.toml' \
+        && datalad save ./ \
+        # UUID: 'logout dsind session'
+        && datalad run "uuidgen -t > .uuid.txt ; cat .uuid.txt >> .uuid.log" \
+    )
+
+####
+# USER user # dsind.github.io+dsind_user@gmail.com
+################################################################################
+
 ################################################################################
 # WIP
 ####
 
+
 ####
 # WIP
 ################################################################################
+
+# NOTE: Phusion expects to run as root for it's entrypoint.
+USER root
+WORKDIR /root/
 
 #########
 #########
