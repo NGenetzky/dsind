@@ -1,3 +1,12 @@
+
+# References
+# https://medium.com/@tonistiigi/advanced-multi-stage-build-patterns-6f741b852fae
+
+
+##################################################################################
+##################################################################################
+# FROM phusion/baseimage:0.11 as phusion-datalad_0.11-r0.0
+#
 # Use phusion/baseimage as base image. To make your builds reproducible, make
 # sure you lock down to a specific version, not to `latest`!
 #
@@ -8,7 +17,10 @@
 # |   18.04    |  0.11   | released on Aug 16, 2018 |
 # |   16.04    | 0.9.22  | released on May 17, 2017 |
 #
-FROM phusion/baseimage:0.11
+#########
+#########
+
+FROM phusion/baseimage:0.11 as phusion-datalad_0.11-r0.0
 
 ################################################################################
 # System Setup for dsind
@@ -180,44 +192,6 @@ RUN cd '/root/' \
 # USER root # dsind.github.io+dsind_root@gmail.com
 ################################################################################
 
-################################################################################
-# WIP
-####
-
-####
-# WIP
-################################################################################
-
-################################################################################
-# git-annex
-####
-
-# TODO: Provide git-annex without depending on 'neuro.debian.net'
-# # Add apt repository from neuro debian
-# # "http://neuro.debian.net/lists/bionic.us-tn.full"
-# # Install ppa key for 'neurodebian' so that we can install the
-# # latest 'git-annex' (Ubuntu 18.04 only has 6.20180227-1).
-# # http://neuro.debian.net/install_pkg.html?p=git-annex-standalone
-# COPY .local/share/keyring/neuro.debian.net.asc /tmp/
-# RUN cat '/tmp/neuro.debian.net.asc' | apt-key add - \
-#     && curl \
-#         -o "/etc/apt/sources.list.d/neurodebian.sources.list" \
-#             "http://neuro.debian.net/lists/bionic.us-tn.full" \
-#     && apt-get --quiet --yes update \
-#     # Then we can proceed with our packages
-#     && apt-get -y install --no-install-recommends \
-#         # Basic tools
-#         # Install git-annex and datalad
-#         git-annex-standalone \
-#         datalad \
-#     # Clean up
-#     && apt-get autoremove -y \
-#     && apt-get clean \
-#     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-####
-# git-annex
-################################################################################
 
 ################################################################################
 # docker args for metadata
@@ -252,6 +226,7 @@ ARG META_MAINTAINER='Nathan Genetzky <nathan@genetzky.us>'
 # docker args for metadata
 ################################################################################
 
+
 ################################################################################
 # docker metadata
 
@@ -276,3 +251,85 @@ LABEL \
 ####
 # docker metadata
 ################################################################################
+
+
+#########
+#########
+# FROM phusion/baseimage:0.11 as phusion-datalad_0.11-r0.0
+##################################################################################
+##################################################################################
+
+
+##################################################################################
+##################################################################################
+# FROM phusion-datalad_0.11-r0.0 as phusion-datalad_0.11-r0.1
+#########
+#########
+
+# FROM locally build image:
+FROM phusion-datalad_0.11-r0.0 as phusion-datalad_0.11-r0.1
+
+# FROM cached image:
+# FROM ngenetzky/dsind-host-phusion:latest as phusion-datalad_0.11-r0.1
+# FROM ngenetzky/dsind-host-phusion:build as phusion-datalad_0.11-r0.1
+
+################################################################################
+# git-annex
+####
+
+# TODO: Provide git-annex without depending on 'neuro.debian.net'
+# # Add apt repository from neuro debian
+# # "http://neuro.debian.net/lists/bionic.us-tn.full"
+# # Install ppa key for 'neurodebian' so that we can install the
+# # latest 'git-annex' (Ubuntu 18.04 only has 6.20180227-1).
+# # http://neuro.debian.net/install_pkg.html?p=git-annex-standalone
+COPY .local/share/keyring/neuro.debian.net.asc /tmp/
+RUN cat '/tmp/neuro.debian.net.asc' | apt-key add - \
+    && curl \
+        -o "/etc/apt/sources.list.d/neurodebian.sources.list" \
+            "http://neuro.debian.net/lists/bionic.us-tn.full" \
+    && apt-get --quiet --yes update \
+    # Then we can proceed with our packages
+    && apt-get -y install --no-install-recommends \
+        # Install git-annex (install datalad from pip)
+        git-annex-standalone \
+    # Clean up
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+####
+# git-annex
+################################################################################
+
+#########
+#########
+# FROM phusion-datalad_0.11-r0.0 as phusion-datalad_0.11-r0.1
+##################################################################################
+##################################################################################
+
+##################################################################################
+##################################################################################
+# FROM PN_PV-PR as dsind
+#
+# Default stage. Use this to easily change the stage built by docker build.
+# Any "WIP" sort of work should be done under this.
+#########
+#########
+
+# FROM phusion-datalad_0.11-r0.0 as dsind
+FROM phusion-datalad_0.11-r0.1 as dsind
+
+################################################################################
+# WIP
+####
+
+####
+# WIP
+################################################################################
+
+#########
+#########
+# FROM PN_PV-PR as dsind
+##################################################################################
+##################################################################################
