@@ -142,6 +142,7 @@ RUN cd '/etc/skel/' \
 # System Setup for dsind
 ################################################################################
 
+
 ################################################################################
 # USER root # dsind.github.io+dsind_root@gmail.com
 ####
@@ -419,6 +420,18 @@ RUN cd "/home/${USER_NAME}" \
 ################################################################################
 # WIP
 ####
+
+COPY .config/datalad/procedures /home/user/.dsind/.config/datalad/procedures
+RUN cd '/home/user/.dsind/' \
+    && datalad save ./ \
+    && printf "%80s\n" ' ' | tr ' ' '-' \
+    && ( \
+        install -d '/home/user/.config/datalad/procedures/' \
+        && install -m 600 -t '/home/user/.config/datalad/procedures/' \
+            '.config/datalad/procedures/cfg_dsind.py' \
+        && datalad run-procedure --discover \
+        && datalad run-procedure cfg_dsind \
+    ) && printf "%80s\n" ' ' | tr ' ' '-'
 
 
 ####

@@ -1,3 +1,5 @@
 *
 # TODO: Provide git-annex without depending on 'neuro.debian.net'
 !.local/share/keyring/neuro.debian.net.asc
+
+!.config/datalad/procedures/cfg_dsind.py
