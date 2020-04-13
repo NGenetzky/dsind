@@ -421,8 +421,29 @@ RUN cd "/home/${USER_NAME}" \
 # WIP
 ####
 
-COPY .config/datalad/procedures /home/user/.dsind/.config/datalad/procedures
-RUN cd '/home/user/.dsind/' \
+
+RUN cd "/home/${USER_NAME}" \
+    && git clone 'https://github.com/NGenetzky/dsind.git' \
+    && cd './dsind/' \
+    && printf "%80s\n" ' ' | tr ' ' '-' \
+    && ( \
+        datalad run \
+            git submodule add \
+                'https://github.com/mdklatt/cookiecutter-python-app.git' \
+                '.local/src/cookiecutter-python-app' \
+    ) \
+    && ( \
+        install -d \
+            './.local/src/github_cirosantilli_lkmc/' \
+        && datalad download-url \
+            --path './.local/src/github_cirosantilli_lkmc/' \
+            https://raw.githubusercontent.com/cirosantilli/linux-kernel-module-cheat/44a45c0656912f7a22b216d452ada52d1b0caa09/shell_helpers.py \
+            https://raw.githubusercontent.com/cirosantilli/linux-kernel-module-cheat/44a45c0656912f7a22b216d452ada52d1b0caa09/LICENSE.txt \
+    ) \
+    && printf "%80s\n" ' ' | tr ' ' '-'
+
+COPY .config/datalad/procedures /home/user/dsind/.config/datalad/procedures
+RUN cd "/home/${USER_NAME}/dsind" \
     && datalad save ./ \
     && printf "%80s\n" ' ' | tr ' ' '-' \
     && ( \
@@ -434,13 +455,15 @@ RUN cd '/home/user/.dsind/' \
     ) \
     && printf "%80s\n" ' ' | tr ' ' '-'
 
-COPY code/python/dsind /home/user/.dsind/code/python/dsind
-RUN cd '/home/user/.dsind/' \
+COPY code/python/dsind /home/user/dsind/code/python/dsind
+RUN cd "/home/${USER_NAME}/dsind" \
     && datalad save ./ \
     && printf "%80s\n" ' ' | tr ' ' '-' \
     && ( \
         datalad run 'cat code/python/dsind/requirements.txt | tee --append requirements.txt' \
-        && pip3 install --user --requirement '/home/user/.dsind/requirements.txt' \
+        && pip3 install \
+            --user --no-cache-dir \
+            --requirement 'requirements.txt' \
     ) \
     && printf "%80s\n" ' ' | tr ' ' '-'
 
