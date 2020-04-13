@@ -112,7 +112,10 @@ RUN groupadd dsind --system --gid '37463' \
         \
         # We will use this template for the start of the user dsind.
         && cp -T -R '/var/lib/dsind/template/' '/etc/skel/.dsind/' \
-    )
+    ) \
+    # This is the quickest way to easily have all of these files owned by dsind group.
+    && chgrp dsind -R '/var/lib/dsind/'
+
 
 RUN cd '/etc/skel/' \
     && date --iso-8601=d > '.dsind/.date.txt' \
@@ -346,7 +349,7 @@ RUN printf "### Building image for user %s (%s:%s) ###" \
     && useradd --create-home --shell "${USER_SHELL}" \
         --uid "${USER_UID}" --gid "${USER_GID}" \
         # NOTE: Added to special group for 'dsind'
-        --group 'dsind' \
+        --groups 'dsind' \
         "${USER_NAME}" \
     #
     # Add sudo support for the non-root user
@@ -406,6 +409,7 @@ RUN cd "/home/${USER_NAME}" \
         && datalad save ./ \
         # UUID: 'logout dsind session'
         && datalad run "uuidgen -t > .uuid.txt ; cat .uuid.txt >> .uuid.log" \
+        && git push 'local/dsind/id-1' \
     )
 
 ####
