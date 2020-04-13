@@ -134,18 +134,10 @@ RUN cd '/etc/skel/' \
 RUN cd '/root/' \
     # Start with the same '/etc/skel' as other user.
     && cp -T -R '/etc/skel/' './' \
-    \
     && date --iso-8601=d > '.dsind/.date.txt' \
-    && uuidgen -t > '.dsind/.uuid.txt' \
-    && cat '.dsind/.uuid.txt' >> '.dsind/.uuid.log' \
-    # Create new dsind host
-    && printf 'date="%s"\nuuid="%s"\nname="%s"\ninfo="%s"\n' \
-        "$(cat .dsind/.date.txt)" \
-        "$(cat .dsind/.uuid.txt)" \
-        "$(hostname)" \
-        "$(uname -a)" \
-        > '.dsind/.host.toml' \
-    # Create new dsind user
+    \
+    # Create new dsind root
+    ## UUID: new dsind root
     && uuidgen -t > '.dsind/.uuid.txt' \
     && cat '.dsind/.uuid.txt' >> '.dsind/.uuid.log' \
     && printf 'date="%s"\nuuid="%s"\nname="%s"\nemail="%s"\n' \
@@ -163,11 +155,25 @@ RUN cd '/root/' \
     # Create the base dataset for this host.
     && ( \
         cd '.dsind/' \
+        # UUID: from 'new dsind root' above
+        && git checkout -b "by-uuid/$(cat .uuid.txt)" \
         && datalad create --force --no-annex './' \
         && datalad save ./ \
+        \
+        # UUID: new dsind host (may be duplicate of UUID from '/etc/skel/')
+        # NOTE: Redo 'new dsind host' in case cache was used for previous layer.
         && datalad run "uuidgen -t > .uuid.txt ; cat .uuid.txt >> .uuid.log" \
-        && git branch "by-uuid/$(cat .uuid.txt)" \
-        && git push 'local/dsind/id-1' "by-uuid/$(cat .uuid.txt):by-uuid/$(cat .uuid.txt)" \
+        # Create new dsind host
+        && printf 'date="%s"\nuuid="%s"\nname="%s"\ninfo="%s"\n' \
+            "$(cat .date.txt)" \
+            "$(cat .uuid.txt)" \
+            "$(hostname)" \
+            "$(uname -a)" \
+            > '.host.toml' \
+        && datalad save ./ \
+        # UUID: 'logout dsind session'
+        && datalad run "uuidgen -t > .uuid.txt ; cat .uuid.txt >> .uuid.log" \
+        && git push 'local/dsind/id-1' \
     )
 
 ####
