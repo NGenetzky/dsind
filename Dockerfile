@@ -22,10 +22,8 @@ RUN apt-get --quiet --yes update \
         dialog \
     # Then we can proceed with our packages
     && apt-get -y install --no-install-recommends \
-        # Basic tools
+        # apt packages for base
         bash \
-        build-essential \
-        ca-certificates \
         curl \
         git \
         lsb-release \
@@ -44,27 +42,63 @@ RUN apt-get --quiet --yes update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Add apt repository from neuro debian
-# "http://neuro.debian.net/lists/bionic.us-tn.full"
-# Install ppa key for 'neurodebian' so that we can install the
-# latest 'git-annex' (Ubuntu 18.04 only has 6.20180227-1).
-# http://neuro.debian.net/install_pkg.html?p=git-annex-standalone
-COPY .local/share/keyring/neuro.debian.net.asc /tmp/
-RUN cat '/tmp/neuro.debian.net.asc' | apt-key add - \
-    && curl \
-        -o "/etc/apt/sources.list.d/neurodebian.sources.list" \
-            "http://neuro.debian.net/lists/bionic.us-tn.full" \
-    && apt-get --quiet --yes update \
-    # Then we can proceed with our packages
-    && apt-get -y install --no-install-recommends \
-        # Basic tools
-        # Install git-annex and datalad
-        git-annex-standalone \
-        datalad \
-    # Clean up
-    && apt-get autoremove -y \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+################################################################################
+# USER root # dsind.github.io+dsind_root@gmail.com
+####
+USER root
+
+ARG PYTHON_REQUIREMENTS_TXT='datalad==0.12.5'
+RUN install -d '/root/.dsind/' \
+    # Install python dependencies
+    && ( \
+        printf '# date="%s"\n# uuid="%s"\n# path="%s"\n' \
+            "$(date --iso-8601=d)" \
+            "$(uuidgen -t)" \
+            '/root/.dsind/requirements.txt' \
+        && echo "${PYTHON_REQUIREMENTS_TXT}" \
+    ) | tee '/root/.dsind/requirements.txt' \
+    && pip3 install --user --requirement '/root/.dsind/requirements.txt' \
+    && ln -s -T '/root/.local/bin/datalad' '/usr/local/sbin/datalad' \
+    \
+    # Configure git user
+    && git config --global user.name "root dsind.github.io" \
+    && git config --global user.email "dsind.github.io+dsind_root@gmail.com" \
+    \
+    # Save the dataset
+    && cd '/root/.dsind/' \
+    && datalad create --force --no-annex './' \
+    && datalad save ./ \
+    # Clean up XDG_CACHE_HOME # TODO: Disable cache or set to unique temp location.
+    && rm -rf '/root/.cache/'
+
+####
+# USER root # dsind.github.io+dsind_root@gmail.com
+################################################################################
+
+# TODO: Provide git-annex without depending on 'neuro.debian.net'
+# # Add apt repository from neuro debian
+# # "http://neuro.debian.net/lists/bionic.us-tn.full"
+# # Install ppa key for 'neurodebian' so that we can install the
+# # latest 'git-annex' (Ubuntu 18.04 only has 6.20180227-1).
+# # http://neuro.debian.net/install_pkg.html?p=git-annex-standalone
+# COPY .local/share/keyring/neuro.debian.net.asc /tmp/
+# RUN cat '/tmp/neuro.debian.net.asc' | apt-key add - \
+#     && curl \
+#         -o "/etc/apt/sources.list.d/neurodebian.sources.list" \
+#             "http://neuro.debian.net/lists/bionic.us-tn.full" \
+#     && apt-get --quiet --yes update \
+#     # Then we can proceed with our packages
+#     && apt-get -y install --no-install-recommends \
+#         # Basic tools
+#         # Install git-annex and datalad
+#         git-annex-standalone \
+#         datalad \
+#     # Clean up
+#     && apt-get autoremove -y \
+#     && apt-get clean \
+#     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+
 
 ################################################################################
 # docker metadata
