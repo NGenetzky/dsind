@@ -26,9 +26,9 @@ build(){
 
     DOCKER_REPO="${1-${DOCKER_REPO}}"
     DOCKER_TAG="${2-${DOCKER_TAG}}"
-    SOURCE_BRANCH='unknown-branch'
-    SOURCE_COMMIT='unknown-commit'
-    DOCKERFILE_PATH='Dockerfile'
+    SOURCE_BRANCH="${SOURCE_BRANCH-unknown-branch}"
+    SOURCE_COMMIT="${SOURCE_BRANCH-unknown-commit}"
+    DOCKERFILE_PATH="${DOCKERFILE_PATH-Dockerfile}"
     IMAGE_NAME="${DOCKER_REPO?}:${DOCKER_TAG?}"
 
     BUILD_DATE="$(date --iso-8601=d)"
