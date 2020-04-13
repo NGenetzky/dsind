@@ -11,8 +11,13 @@ main() {
   local token=$(get_token $image)
   local manifest=$(get_manifest $image $tag $token)
   local digest=$(echo ${manifest} | jq -r '.config.digest')
+  local blob=$(get_blob $image $token $digest)
 
-  get_image_configuration $image $token $digest
+  echo ${manifest} | jq . > "manifest.json"
+  echo ${blob} | jq .> "blob.json"
+
+  # NOTE: This is currently unused.
+  # local container_config=$(echo $blob | jq -r '.container_config')
 }
 
 get_image_configuration() {
@@ -30,7 +35,7 @@ get_image_configuration() {
     --location \
     --header "Authorization: Bearer $token" \
     "https://registry-1.docker.io/v2/$image/blobs/$digest" \
-    | jq -r '.container_config'
+    | jq -r '.'
 }
 
 get_token() {
@@ -62,6 +67,24 @@ get_manifest() {
     --header "Accept: application/vnd.docker.distribution.manifest.v2+json" \
     --header "Authorization: Bearer $token" \
     "https://registry-1.docker.io/v2/$image/manifests/$reference" \
+    | jq -r ''
+}
+
+get_blob() {
+  local image=$1
+  local token=$2
+  local digest=$3
+
+  echo "Retrieving Image Configuration.
+    IMAGE:  $image
+    DIGEST: $digest
+  " >&2
+
+  curl \
+    --silent \
+    --location \
+    --header "Authorization: Bearer $token" \
+    "https://registry-1.docker.io/v2/$image/blobs/$digest" \
     | jq -r ''
 }
 
