@@ -416,14 +416,24 @@ RUN cd "/home/${USER_NAME}" \
 # WIP
 ####
 
+RUN cd "/home/${USER_NAME}" \
+    && ( \
+        git clone 'https://gitlab.com/NGenetzky/meta-bb-project-base.git' \
+        && cd 'meta-bb-project-base' \
+        && './scripts/setup.sh' \
+    )
+
+
+USER ${USER_NAME}
+WORKDIR "/home/${USER_NAME}"
 
 ####
 # WIP
 ################################################################################
 
 # NOTE: Phusion expects to run as root for it's entrypoint.
-USER root
-WORKDIR /root/
+# USER root
+# WORKDIR /root/
 
 #########
 #########
