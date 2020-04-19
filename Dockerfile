@@ -416,11 +416,34 @@ RUN cd "/home/${USER_NAME}" \
 # WIP
 ####
 
+ENV HOME "/home/${USER_NAME}"
+# The XDG standard suggests ~/.local/bin as the path for local user-specific
+# installs. See https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+ENV PATH "${HOME}/bin:${HOME}/.local/bin:${PATH}"
+
 RUN cd "/home/${USER_NAME}" \
     && ( \
         git clone 'https://gitlab.com/NGenetzky/meta-bb-project-base.git' \
         && cd 'meta-bb-project-base' \
         && './scripts/setup.sh' \
+    )
+
+RUN cd "/home/${USER_NAME}" \
+    && ( \
+        git clone 'https://github.com/NGenetzky/ngenetzky-binder.git' \
+        && cd 'ngenetzky-binder' \
+        && pip3 install --user --no-cache-dir \
+            -r ./binder/requirements.txt \
+        && pip3 install --user --no-cache-dir \
+            jupytext  \
+            papermill \
+    )
+
+RUN cd "/home/${USER_NAME}" \
+    && ( \
+        cd 'ngenetzky-binder' \
+        && papermill ./demo.ipynb ./demo.out.ipynb \
+        && jupytext --to py ./demo.ipynb \
     )
 
 

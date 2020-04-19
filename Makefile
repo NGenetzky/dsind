@@ -9,6 +9,7 @@ DOCKER_REPO=ngenetzky/dsind
 DOCKER_TAG=latest
 IMAGE_NAME=${DOCKER_REPO}:${DOCKER_TAG}
 
+DOCKER_ARGS_RUN=-v $(DIR):/mnt/
 
 ################################################################################
 # This will output the help for each task
@@ -33,6 +34,7 @@ run: ## Run the container
 login: ## Run login shell in the container
 	docker run -it \
 		--entrypoint /bin/bash \
+		${DOCKER_ARGS_RUN} \
 		"${DOCKER_REPO}:${DOCKER_TAG}" \
 		--login
 
