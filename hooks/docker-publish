@@ -111,7 +111,10 @@ publish() {
 
     # Work from base dir
     cd "${BASE_DIR}/${REL_TO_BASE}"
-    [[ -f "${DOCKERFILE_PATH}" ]] || exit 1
+    if [[ ! -f "${DOCKERFILE_PATH}" ]]; then
+        echo "Dockerfile not found at $(pwd)/${DOCKERFILE_PATH}" >&2
+        exit 1
+    fi
 
     if [[ "${PUSH}" == 'true' && -n "${REGISTRY_PASSWORD-}" ]]; then
         echo "${REGISTRY_PASSWORD}" | docker login "${REGISTRY}" \
