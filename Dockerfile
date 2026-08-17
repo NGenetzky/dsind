@@ -2,13 +2,13 @@
 # sure you lock down to a specific version, not to `latest`!
 #
 # https://github.com/phusion/baseimage-docker/releases
-# ___________________________________________________________
-# | Ubuntu LTS | Phusion | Notes from Phusion       |
-# |------------|---------|--------------------------|
-# |   18.04    |  0.11   | released on Aug 16, 2018 |
-# |   16.04    | 0.9.22  | released on May 17, 2017 |
+# _____________________________________________________________
+# | Ubuntu LTS | Phusion       | Notes from Phusion             |
+# |------------|---------------|---------------------------------|
+# |   22.04    |  jammy-1.0.5  | released on Aug 16, 2026        |
+# |   18.04    |  0.11         | released on Aug 16, 2018        |
 #
-FROM phusion/baseimage:0.11
+FROM phusion/baseimage:jammy-1.0.5
 
 # Using "ARG" influences the behavior of apt only while building container.
 # No Debian that's a bad Debian! We don't have an interactive prompt don't fail
@@ -44,23 +44,25 @@ RUN apt-get --quiet --yes update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Add apt repository from neuro debian
-# "http://neuro.debian.net/lists/bionic.us-tn.full"
-# Install ppa key for 'neurodebian' so that we can install the
-# latest 'git-annex' (Ubuntu 18.04 only has 6.20180227-1).
-# http://neuro.debian.net/install_pkg.html?p=git-annex-standalone
-COPY .local/share/keyring/neuro.debian.net.asc /tmp/
-RUN cat '/tmp/neuro.debian.net.asc' | apt-key add - \
-    && curl \
-        -o "/etc/apt/sources.list.d/neurodebian.sources.list" \
-            "http://neuro.debian.net/lists/bionic.us-tn.full" \
+# Install git-annex and datalad.
+#
+# git-annex is installed from the "standalone" .deb build published by the
+# DataLad team (https://github.com/con/git-annex), the same builds that are
+# distributed via NeuroDebian. Pinning to a specific release keeps the image
+# reproducible; bump GIT_ANNEX_VERSION/GIT_ANNEX_DEB_SHA256 to upgrade.
+#
+# datalad is installed from PyPI, pinned via DATALAD_VERSION.
+ARG GIT_ANNEX_VERSION=10.20260525
+ARG GIT_ANNEX_DEB_SHA256=342341a21c44805171e830ec7045075fdb9de76823b2167e9e98de5c939ffc74
+ARG DATALAD_VERSION=1.6.2
+
+RUN GIT_ANNEX_DEB="git-annex-standalone_${GIT_ANNEX_VERSION}-1.ndall+1_amd64.deb" \
+    && curl --fail --location --output "/tmp/${GIT_ANNEX_DEB}" \
+        "https://github.com/con/git-annex/releases/download/${GIT_ANNEX_VERSION}/${GIT_ANNEX_DEB}" \
+    && echo "${GIT_ANNEX_DEB_SHA256}  /tmp/${GIT_ANNEX_DEB}" | sha256sum --check --strict \
     && apt-get --quiet --yes update \
-    # Then we can proceed with our packages
-    && apt-get -y install --no-install-recommends \
-        # Basic tools
-        # Install git-annex and datalad
-        git-annex-standalone \
-        datalad \
+    && apt-get -y install --no-install-recommends "/tmp/${GIT_ANNEX_DEB}" \
+    && python3 -m pip install --no-cache-dir "datalad==${DATALAD_VERSION}" \
     # Clean up
     && apt-get autoremove -y \
     && apt-get clean \
