@@ -1,0 +1,157 @@
+#!/bin/bash
+# This script builds, tags, and (optionally) pushes the dsind Docker image.
+#
+# It is invoked by the "docker-publish" GitHub Actions workflow
+# (.github/workflows/docker-publish.yml), which sets the GITHUB_*
+# environment variables described below from its workflow/job context.
+# It replicates as much of that workflow's logic as possible (push
+# decision, tag/label computation, build-arg wiring, GHA layer caching)
+# so that the same process can be run and debugged locally with `docker`.
+#
+# Environment variables (all optional; defaults are suitable for a local
+# build):
+#   REGISTRY            Destination registry (default: ghcr.io)
+#   IMAGE_NAME           "owner/repo" style image name (default: ngenetzky/dsind)
+#   DOCKERFILE_PATH      Path to the Dockerfile, relative to the repo root
+#   GITHUB_EVENT_NAME    push | pull_request | workflow_dispatch (default: push)
+#   GITHUB_REF_TYPE      branch | tag (default: branch)
+#   GITHUB_REF_NAME      Branch or tag name (default: current git branch)
+#   GITHUB_SHA           Commit SHA (default: current git commit)
+#   GITHUB_ACTOR         Registry login username (default: $USER)
+#   GITHUB_REPOSITORY    "owner/repo" used for the source label (default: IMAGE_NAME)
+#   DEFAULT_BRANCH       Repository default branch (default: main)
+#   PR_NUMBER            Pull request number, used for pull_request events
+#   PUSH_INPUT           true|false override used for workflow_dispatch events
+#   REGISTRY_PASSWORD    Password/token used to `docker login`; if unset, login is skipped
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Bash Strict Mode
+    set -eu -o pipefail
+    IFS=$'\n\t'
+fi
+
+# config
+_REGISTRY='ghcr.io'
+_IMAGE_NAME='ngenetzky/dsind'
+_DOCKERFILE_PATH='Dockerfile'
+_DEFAULT_BRANCH='main'
+REL_TO_BASE="./../"
+
+BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+readonly \
+    BASE_DIR \
+    REL_TO_BASE \
+    _REGISTRY \
+    _IMAGE_NAME \
+    _DOCKERFILE_PATH \
+    _DEFAULT_BRANCH
+
+publish() {
+    REGISTRY="${REGISTRY-${_REGISTRY}}"
+    IMAGE_NAME="${IMAGE_NAME-${_IMAGE_NAME}}"
+    DOCKERFILE_PATH="${DOCKERFILE_PATH-${_DOCKERFILE_PATH}}"
+    DEFAULT_BRANCH="${DEFAULT_BRANCH-${_DEFAULT_BRANCH}}"
+
+    # GitHub Actions context, with fallbacks so this script also works
+    # when run locally, outside of a workflow.
+    GITHUB_EVENT_NAME="${GITHUB_EVENT_NAME-push}"
+    GITHUB_REF_TYPE="${GITHUB_REF_TYPE-branch}"
+    GITHUB_REF_NAME="${GITHUB_REF_NAME-$(git -C "${BASE_DIR}" rev-parse --abbrev-ref HEAD)}"
+    GITHUB_SHA="${GITHUB_SHA-$(git -C "${BASE_DIR}" rev-parse HEAD)}"
+    GITHUB_ACTOR="${GITHUB_ACTOR-${USER-unknown}}"
+    GITHUB_REPOSITORY="${GITHUB_REPOSITORY-${IMAGE_NAME}}"
+    PUSH_INPUT="${PUSH_INPUT-true}"
+    PR_NUMBER="${PR_NUMBER-unknown-pr}"
+
+    SOURCE_BRANCH="${GITHUB_REF_NAME}"
+    SOURCE_COMMIT="${GITHUB_SHA}"
+    SHORT_SHA="${SOURCE_COMMIT:0:7}"
+    BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+    # Determine whether the resulting image should be pushed. Mirrors the
+    # "Determine whether to push" step of the workflow: never push for
+    # pull requests, honor the workflow_dispatch "push" input, and push
+    # otherwise (i.e. for branch/tag pushes).
+    case "${GITHUB_EVENT_NAME}" in
+        pull_request) PUSH='false' ;;
+        workflow_dispatch) PUSH="${PUSH_INPUT}" ;;
+        *) PUSH='true' ;;
+    esac
+
+    # Compute image tags, mirroring docker/metadata-action's defaults used
+    # in the workflow:
+    #   - pr-<number>                 for pull_request events
+    #   - <version>, <major>.<minor>  for tag pushes matching v*.*.*
+    #   - <branch>, and "latest"      for pushes to the default branch
+    #   - sha-<short sha>             always
+    TAGS=()
+    if [[ "${GITHUB_EVENT_NAME}" == 'pull_request' ]]; then
+        TAGS+=("pr-${PR_NUMBER}")
+    elif [[ "${GITHUB_REF_TYPE}" == 'tag' && "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        VERSION="${GITHUB_REF_NAME#v}"
+        TAGS+=("${VERSION}" "${VERSION%.*}")
+    else
+        TAGS+=("${GITHUB_REF_NAME}")
+        if [[ "${GITHUB_REF_NAME}" == "${DEFAULT_BRANCH}" ]]; then
+            TAGS+=('latest')
+        fi
+    fi
+    TAGS+=("sha-${SHORT_SHA}")
+
+    TAG_ARGS=()
+    for tag in "${TAGS[@]}"; do
+        safe_tag="${tag//\//-}"
+        TAG_ARGS+=(-t "${REGISTRY}/${IMAGE_NAME}:${safe_tag}")
+    done
+
+    LABEL_ARGS=(
+        --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}"
+        --label "org.opencontainers.image.revision=${SOURCE_COMMIT}"
+        --label "org.opencontainers.image.created=${BUILD_DATE}"
+    )
+
+    # Work from base dir
+    cd "${BASE_DIR}/${REL_TO_BASE}"
+    if [[ ! -f "${DOCKERFILE_PATH}" ]]; then
+        echo "Dockerfile not found at $(pwd)/${DOCKERFILE_PATH}" >&2
+        exit 1
+    fi
+
+    if [[ "${PUSH}" == 'true' && -n "${REGISTRY_PASSWORD-}" ]]; then
+        printf '%s' "${REGISTRY_PASSWORD}" | docker login "${REGISTRY}" \
+            --username "${GITHUB_ACTOR}" \
+            --password-stdin
+    fi
+
+    # Reuse GitHub Actions' layer cache when running inside a workflow that
+    # has already set up a buildx builder for it; fall back to no remote
+    # cache when building locally.
+    CACHE_ARGS=()
+    if [[ -n "${ACTIONS_CACHE_URL-}" && -n "${ACTIONS_RUNTIME_TOKEN-}" ]]; then
+        CACHE_ARGS+=(--cache-from 'type=gha' --cache-to 'type=gha,mode=max')
+    fi
+
+    PUSH_OR_LOAD_ARGS=(--load)
+    if [[ "${PUSH}" == 'true' ]]; then
+        PUSH_OR_LOAD_ARGS=(--push)
+    fi
+
+    DOCKER_TAG="${TAGS[0]}"
+
+    docker buildx build \
+        --build-arg "SOURCE_BRANCH=${SOURCE_BRANCH}" \
+        --build-arg "SOURCE_COMMIT=${SOURCE_COMMIT}" \
+        --build-arg "BUILD_DATE=${BUILD_DATE}" \
+        --build-arg "DOCKER_REPO=${IMAGE_NAME}" \
+        --build-arg "DOCKER_TAG=${DOCKER_TAG}" \
+        "${LABEL_ARGS[@]}" \
+        "${TAG_ARGS[@]}" \
+        "${CACHE_ARGS[@]}" \
+        "${PUSH_OR_LOAD_ARGS[@]}" \
+        -f "${DOCKERFILE_PATH}" \
+        .
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    publish "$@"
+fi
