@@ -100,7 +100,8 @@ publish() {
 
     TAG_ARGS=()
     for tag in "${TAGS[@]}"; do
-        TAG_ARGS+=(-t "${REGISTRY}/${IMAGE_NAME}:${tag}")
+        safe_tag="${tag//\//-}"
+        TAG_ARGS+=(-t "${REGISTRY}/${IMAGE_NAME}:${safe_tag}")
     done
 
     LABEL_ARGS=(
@@ -117,7 +118,7 @@ publish() {
     fi
 
     if [[ "${PUSH}" == 'true' && -n "${REGISTRY_PASSWORD-}" ]]; then
-        echo "${REGISTRY_PASSWORD}" | docker login "${REGISTRY}" \
+        printf '%s' "${REGISTRY_PASSWORD}" | docker login "${REGISTRY}" \
             --username "${GITHUB_ACTOR}" \
             --password-stdin
     fi
@@ -126,7 +127,7 @@ publish() {
     # has already set up a buildx builder for it; fall back to no remote
     # cache when building locally.
     CACHE_ARGS=()
-    if [[ -n "${ACTIONS_CACHE_URL-}${ACTIONS_RESULTS_URL-}" ]]; then
+    if [[ -n "${ACTIONS_CACHE_URL-}" && -n "${ACTIONS_RUNTIME_TOKEN-}" ]]; then
         CACHE_ARGS+=(--cache-from 'type=gha' --cache-to 'type=gha,mode=max')
     fi
 
@@ -135,10 +136,14 @@ publish() {
         PUSH_OR_LOAD_ARGS=(--push)
     fi
 
+    DOCKER_TAG="${TAGS[0]}"
+
     docker buildx build \
         --build-arg "SOURCE_BRANCH=${SOURCE_BRANCH}" \
         --build-arg "SOURCE_COMMIT=${SOURCE_COMMIT}" \
         --build-arg "BUILD_DATE=${BUILD_DATE}" \
+        --build-arg "DOCKER_REPO=${IMAGE_NAME}" \
+        --build-arg "DOCKER_TAG=${DOCKER_TAG}" \
         "${LABEL_ARGS[@]}" \
         "${TAG_ARGS[@]}" \
         "${CACHE_ARGS[@]}" \
